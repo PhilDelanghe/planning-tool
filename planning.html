@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Planning Project</title>
+<style>
+:root {
+  --col-w: 28px;
+  --row-h: 26px;
+  --task-col-w: 400px;
+  --days-col-w: 40px;
+  --actor-col-w: 130px;
+  --left-total: calc(var(--task-col-w) + var(--days-col-w) + var(--actor-col-w));
+  --border: #d0d0d0;
+  --weekend: #f5f5f5;
+  --month-bg: #e8eef6;
+  --week-bg: #f4f6fa;
+  --phase-bg: #e8eef6;
+}
+* { box-sizing: border-box; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px; padding: 12px; color: #222; background: #fff;
+}
+
+/* ---- Header ---- */
+header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
+header h1 { font-size: 15px; font-weight: 600; }
+.params { display: flex; gap: 10px; align-items: center; font-size: 12px; color: #555; }
+.params label { display: flex; gap: 4px; align-items: center; }
+.params input, .params select { font-size: 12px; padding: 2px 4px; }
+.params input[type="number"] { width: 50px; }
+.toolbar { display: flex; gap: 6px; }
+.toolbar button {
+  font-size: 11px; padding: 4px 10px; border: 1px solid var(--border);
+  border-radius: 3px; background: #fff; cursor: pointer;
+}
+.toolbar button:hover { background: #f4f4f4; }
+
+/* ---- Legend (display only) ---- */
+.legend-bar {
+  display: flex; gap: 8px; align-items: center; font-size: 11px;
+  margin-bottom: 8px; padding: 4px 0;
+}
+.legend-bar .chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border: 1px solid var(--border); border-radius: 3px;
+}
+.legend-bar .sw { display: inline-block; width: 14px; height: 14px; border-radius: 2px; }
+
+/* ---- Grid ---- */
+.grid-wrap {
+  overflow: auto; max-height: calc(100vh - 110px); border: 1px solid var(--border);
+  -webkit-user-select: none; user-select: none;
+}
+table.grid { border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+table.grid th, table.grid td {
+  border: 1px solid var(--border); padding: 0; text-align: center; height: var(--row-h);
+}
+th.col-date { width: var(--col-w); min-width: var(--col-w); }
+th.col-month { background: var(--month-bg); font-weight: 600; }
+th.col-week { background: var(--week-bg); font-weight: 500; }
+th.col-day-name { font-weight: 400; color: #666; }
+th.col-day { font-weight: 400; }
+th.weekend, td.weekend { background: var(--weekend); color: #bbb; }
+th.ferie, td.ferie { background: #ffe0e0; color: #c66; }
+
+/* left columns */
+th.task-head, td.task-name {
+  width: var(--task-col-w); min-width: var(--task-col-w);
+  padding: 2px 8px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+th.days-head, td.days-count {
+  width: var(--days-col-w); min-width: var(--days-col-w);
+  text-align: center; font-weight: 600; font-size: 11px; color: #555;
+}
+th.actor-head, td.actor-name {
+  width: var(--actor-col-w); min-width: var(--actor-col-w);
+  text-align: center; padding: 2px 6px; font-weight: 600; font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* phases */
+tr.phase td.task-name {
+  background: var(--phase-bg); color: #222;
+  font-weight: 700; font-size: 12px; text-align: left; padding-left: 10px;
+}
+tr.phase td.days-count { background: var(--phase-bg); }
+tr.phase td.actor-name { background: var(--phase-bg); }
+tr.phase td.cell { background: #f0f2f5; }
+
+/* tâches : alignées à droite */
+tr.tache td.task-name { text-align: right; padding-right: 10px; }
+
+/* totaux */
+tr.total td { font-weight: 700; font-size: 12px; background: #f8f8f8; }
+tr.total td.task-name { text-align: right; padding-right: 10px; }
+
+/* sticky */
+thead th { position: sticky; top: 0; background: #fff; z-index: 3; }
+thead th.col-month { top: 0; z-index: 4; }
+thead th.col-week  { top: var(--row-h); z-index: 4; }
+thead th.col-day-name { top: calc(var(--row-h) * 2); z-index: 4; }
+thead th.col-day   { top: calc(var(--row-h) * 3); z-index: 4; }
+thead th.task-head { left: 0; position: sticky; z-index: 10; background: #fff; }
+thead th.days-head { left: var(--task-col-w); position: sticky; z-index: 10; background: #fff; }
+thead th.actor-head { left: calc(var(--task-col-w) + var(--days-col-w)); position: sticky; z-index: 10; background: #fff; }
+tbody td.task-name { position: sticky; left: 0; background: #fff; z-index: 2; }
+tbody td.days-count { position: sticky; left: var(--task-col-w); background: #fff; z-index: 2; }
+tbody td.actor-name { position: sticky; left: calc(var(--task-col-w) + var(--days-col-w)); z-index: 2; }
+tr.phase td.task-name { left: 0; background: var(--phase-bg); }
+tr.phase td.days-count { left: var(--task-col-w); background: var(--phase-bg); }
+tr.phase td.actor-name { left: calc(var(--task-col-w) + var(--days-col-w)); background: var(--phase-bg); }
+tr.total td.task-name { position: sticky; left: 0; background: #f8f8f8; z-index: 2; }
+tr.total td.days-count { position: sticky; left: var(--task-col-w); background: #f8f8f8; z-index: 2; }
+tr.total td.actor-name { position: sticky; left: calc(var(--task-col-w) + var(--days-col-w)); background: #f8f8f8; z-index: 2; }
+
+/* data cells */
+td.cell { cursor: pointer; }
+td.cell.filled { font-size: 0; }
+
+/* ---- Context menu ---- */
+.ctx-menu {
+  position: fixed; z-index: 100; background: #fff; border: 1px solid #bbb;
+  border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  padding: 4px 0; min-width: 200px; font-size: 12px;
+}
+.ctx-menu .item {
+  padding: 5px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+}
+.ctx-menu .item:hover { background: #f0f0f0; }
+.ctx-menu .sep { border-top: 1px solid #e0e0e0; margin: 3px 0; }
+.ctx-menu .sub { position: relative; }
+.ctx-menu .sub > .sub-menu {
+  display: none; position: absolute; left: 100%; top: -4px;
+  background: #fff; border: 1px solid #bbb; border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); padding: 4px 0; min-width: 130px;
+}
+.ctx-menu .sub:hover > .sub-menu { display: block; }
+
+/* ---- Print ---- */
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  body { padding: 0; margin: 0; font-size: 9px; }
+  header, .legend-bar { font-size: 9px; }
+  .toolbar { display: none; }
+  .grid-wrap { max-height: none; overflow: visible; border: none; user-select: auto; }
+  table.grid { font-size: 8px; }
+  th, td { height: 18px !important; }
+  th.col-date { width: 18px !important; min-width: 18px !important; }
+}
+
+@page { size: landscape; margin: 10mm; }
+#print-pages { display: none; }
+@media print {
+  .no-print { display: none !important; }
+  #print-pages { display: block; }
+  #print-pages .print-page { page-break-after: always; }
+  #print-pages .print-page:last-child { page-break-after: auto; }
+  #print-pages .print-page-inner { transform-origin: top left; }
+  #print-pages .print-page-header {
+    display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;
+  }
+  #print-pages .print-page-header h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  #print-pages .print-page-header .page-num { font-size: 10px; color: #888; }
+  #print-pages .print-legend {
+    display: flex; gap: 6px; align-items: center; font-size: 9px; margin-bottom: 4px;
+  }
+  #print-pages .print-legend .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 6px; border: 1px solid #ccc; border-radius: 3px;
+  }
+  #print-pages .print-legend .sw {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  }
+  #print-pages th, #print-pages td { position: static !important; }
+  #print-pages th.task-head, #print-pages td.task-name {
+    width: 250px !important; min-width: 250px !important; max-width: 250px !important;
+  }
+  #print-pages th.actor-head, #print-pages td.actor-name {
+    width: 80px !important; min-width: 80px !important; max-width: 80px !important; font-size: 7px;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title">Planning</h1>
+  <div class="params">
+    <label>Début <input type="date" id="p-start"/></label>
+    <label>Semaines <input type="number" id="p-weeks" min="1" max="52"/></label>
+    <button id="p-apply">Appliquer</button>
+  </div>
+  <div class="toolbar">
+    <button id="btn-save" title="Sauvegarder le planning">💾 Sauvegarder</button>
+    <button id="btn-load" title="Charger un planning">📂 Charger</button>
+    <button id="btn-pdf" title="Imprimer / PDF">🖨 PDF</button>
+    <button id="btn-export" title="Export client (lecture seule)">📤 Export client</button>
+  </div>
+</header>
+<div class="legend-bar" id="legend"></div>
+<div class="grid-wrap" id="grid-wrap">
+  <table class="grid" id="grid"></table>
+</div>
+<input type="file" id="file-input" accept=".md,.html" style="display:none"/>
+
+<script type="text/markdown" id="embedded-md">
+# Planning Project Client XXX - Heure n°4
+
+## Paramètres
+- Date de départ: 2026-03-09
+- Durée: 15 semaines
+- Client: Client
+- Prestataire: Prestataire
+
+## Légende
+- client: #FFD966 "Actions Client" acteur="Client"
+- presta: #4DD9C0 "Actions Prestataire" acteur="Prestataire"
+- sync: #B266FF "Temps synchrones" acteur="Client/Prestataire"
+- livraison: #93C47D "Livraisons" acteur="Prestataire"
+
+## Planning
+
+### Prérequis à la réalisation - Revue et arbitrage matière côté Client
+
+### Conception (digital)
+- Atelier(s) de co-construction | sync
+- Rédaction des synopsis - V1 | presta
+- Livraison V1 | livraison
+- Revue clients | client
+- Ateliers de partage des retours clients | sync
+- Mise à jour des synopsis | presta
+- Livraison V2 | livraison
+- Validation clients | client
+
+### Conception détaillée (digital)
+- Rédaction des storyboards - V1 | presta
+- Livraison V1 | livraison
+- Revue clients | client
+- Ateliers de partage des retours clients | sync
+- Mise à jour des storyboards | presta
+- Livraison V2 | livraison
+- Validation clients | client
+
+### Réalisation graphiques
+- Déclinaison graphique des écrans pour Storyline | presta
+- Réalisation des autres médias (fiches, vidéos, podcast...) | presta
+- Repasse graphique | presta
+
+### Réalisation (Intégration)
+- Enregistrement des voix-off | presta
+- Intégration dans l'outil auteur - V1 | presta
+- Livraison V1 | livraison
+
+### Test & recette clients
+- Test & recette clients des ressources V1 | client
+- Ateliers de partage des retours clients | sync
+- Mise à jour des ressources | presta
+- Livraison V2 | livraison
+- Validation clients | client
+
+### Fin de la réalisation Heure n°4
+</script>
+
+<script>
+/* =========================================================
+   Planning Tool - Proto v4
+   Colonne jours + totaux + versioning
+   ========================================================= */
+
+const JOURS_NOMS = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+const MOIS_NOMS  = ["Janvier","Février","Mars","Avril","Mai","Juin",
+                    "Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+let PLAN = { titre:"", params:{date_debut:"",duree_semaines:15,client:"",prestataire:""}, legende:[], taches:[], cellules:{} };
+let COLS = [];
+let isDragging = false;
+let dragTid = null;
+let dragCode = null;
+let saveVersion = 1;
+
+/* ---- Markdown parser ---- */
+function parseMd(text) {
+  const lines = text.split("\n");
+  const plan = { titre:"", params:{date_debut:"",duree_semaines:15,client:"",prestataire:""}, legende:[], taches:[], cellules:{} };
+  let section = "", tid = 0;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("# ") && !line.startsWith("## ")) { plan.titre = line.slice(2).trim(); continue; }
+    if (line.startsWith("## ")) { section = line.slice(3).trim().toLowerCase(); continue; }
+    if (line.startsWith("### ")) {
+      section = "planning"; tid++;
+      plan.taches.push({ id: tid, type: "phase", nom: line.slice(4).trim() });
+      continue;
+    }
+    if (section.startsWith("param")) {
+      const m = line.match(/^-\s*(.+?):\s*(.+)$/);
+      if (m) {
+        const k = m[1].toLowerCase(), v = m[2].trim();
+        if (k.includes("date")) plan.params.date_debut = v;
+        if (k.includes("dur")) plan.params.duree_semaines = parseInt(v, 10);
+        if (k.includes("client")) plan.params.client = v;
+        if (k.includes("prestataire")) plan.params.prestataire = v;
+      }
+      continue;
+    }
+    if (section.startsWith("lég") || section.startsWith("leg")) {
+      const m = line.match(/^-\s*(\w+)\s*:\s*(#[0-9a-fA-F]{6})\s*"([^"]+)"(?:\s*acteur="([^"]*)")?/);
+      if (m) plan.legende.push({ code: m[1], color: m[2], label: m[3], acteur: m[4] || m[3] });
+      continue;
+    }
+    if (section === "planning") {
+      // Format: - Nom | type | JJ/MM | Nj  (date and duration optional)
+      const m = line.match(/^-\s*(.+?)\s*\|\s*(\w+)(?:\s*\|\s*(\d{1,2}\/\d{1,2})(?:\s*\|\s*(\d+)\s*j)?)?$/);
+      if (m) {
+        tid++;
+        const t = { id: tid, type: "tache", nom: m[1].trim(), acteur: m[2].trim() };
+        if (m[3]) t.dateStr = m[3].trim(); // JJ/MM
+        if (m[4]) t.duree = parseInt(m[4], 10);
+        plan.taches.push(t);
+      }
+    }
+  }
+  // Fallback: embedded cell data (legacy format)
+  const cm = text.match(/<!-- CELLULES\n([\s\S]*?)\nCELLULES -->/);
+  if (cm) { try { plan.cellules = JSON.parse(cm[1]); } catch(e) {} }
+  if (!plan.cellules) plan.cellules = {};
+  const vm = text.match(/<!-- VERSION (\d+) -->/);
+  if (vm) saveVersion = parseInt(vm[1], 10);
+  return plan;
+}
+
+/* Fill cells from inline dates (after COLS are built) */
+function fillCellsFromDates() {
+  // Only if no CELLULES block was loaded (dates are the source of truth)
+  const hasCellules = Object.keys(PLAN.cellules).length > 0;
+  if (hasCellules) return; // CELLULES block wins
+
+  const year = new Date(PLAN.params.date_debut).getFullYear();
+  PLAN.taches.forEach(t => {
+    if (t.type === "phase" || !t.dateStr || !t.duree) return;
+    const [dd, mm] = t.dateStr.split("/").map(Number);
+    const startDate = new Date(year, mm - 1, dd);
+    // If date is before the planning start, try next year
+    const planStart = new Date(PLAN.params.date_debut + "T00:00:00");
+    if (startDate < planStart) startDate.setFullYear(startDate.getFullYear() + 1);
+
+    // Find column index for this date
+    let placed = 0;
+    for (let ci = 0; ci < COLS.length && placed < t.duree; ci++) {
+      if (isOff(COLS[ci])) continue; // skip weekends
+      if (COLS[ci] >= startDate && placed === 0) {
+        // Check exact date match for first cell
+        if (COLS[ci].getDate() === startDate.getDate() && COLS[ci].getMonth() === startDate.getMonth()) {
+          PLAN.cellules[`${t.id}_${ci}`] = t.acteur;
+          placed++;
+        }
+      } else if (placed > 0) {
+        PLAN.cellules[`${t.id}_${ci}`] = t.acteur;
+        placed++;
+      }
+    }
+    // Fallback: find first col >= startDate
+    if (placed === 0) {
+      let started = false;
+      for (let ci = 0; ci < COLS.length && placed < t.duree; ci++) {
+        if (isOff(COLS[ci])) continue;
+        if (!started && COLS[ci] >= startDate) started = true;
+        if (started) {
+          PLAN.cellules[`${t.id}_${ci}`] = t.acteur;
+          placed++;
+        }
+      }
+    }
+  });
+}
+
+/* ---- Jours fériés français ---- */
+function easterSunday(year) {
+  // Algorithme de Meeus/Jones/Butcher
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15) % 30;
+  const i = Math.floor(c/4), k = c % 4;
+  const l = (32+2*e+2*i-h-k) % 7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const month = Math.floor((h+l-7*m+114)/31);
+  const day = ((h+l-7*m+114) % 31) + 1;
+  return new Date(year, month-1, day);
+}
+
+function joursFeries(year) {
+  const easter = easterSunday(year);
+  const lundiPaques = addDays(easter, 1);
+  const ascension = addDays(easter, 39);
+  const lundiPentecote = addDays(easter, 50);
+  return [
+    new Date(year, 0, 1),   // Jour de l'an
+    new Date(year, 3, 1),   // Lundi de Pâques placeholder (replaced below)
+    new Date(year, 4, 1),   // Fête du travail
+    new Date(year, 4, 8),   // Victoire 1945
+    new Date(year, 6, 14),  // Fête nationale
+    new Date(year, 7, 15),  // Assomption
+    new Date(year, 10, 1),  // Toussaint
+    new Date(year, 10, 11), // Armistice
+    new Date(year, 11, 25), // Noël
+    lundiPaques,
+    ascension,
+    lundiPentecote,
+  ];
+}
+
+let FERIES = new Set();
+function buildFeries() {
+  FERIES = new Set();
+  if (COLS.length === 0) return;
+  const y1 = COLS[0].getFullYear();
+  const y2 = COLS[COLS.length-1].getFullYear();
+  for (let y = y1; y <= y2; y++) {
+    joursFeries(y).forEach(d => FERIES.add(d.toISOString().slice(0,10)));
+  }
+}
+
+function isFerie(d) { return FERIES.has(d.toISOString().slice(0,10)); }
+function isOff(d) { return dow(d) >= 5 || isFerie(d); }
+
+let FERIES_NOMS = {};
+function buildFeriesNoms() {
+  FERIES_NOMS = {};
+  if (COLS.length === 0) return;
+  const y1 = COLS[0].getFullYear();
+  const y2 = COLS[COLS.length-1].getFullYear();
+  for (let y = y1; y <= y2; y++) {
+    const easter = easterSunday(y);
+    const noms = [
+      [new Date(y,0,1), "Jour de l'an"],
+      [addDays(easter,1), "Lundi de Pâques"],
+      [new Date(y,4,1), "Fête du travail"],
+      [new Date(y,4,8), "Victoire 1945"],
+      [addDays(easter,39), "Ascension"],
+      [addDays(easter,50), "Lundi de Pentecôte"],
+      [new Date(y,6,14), "Fête nationale"],
+      [new Date(y,7,15), "Assomption"],
+      [new Date(y,10,1), "Toussaint"],
+      [new Date(y,10,11), "Armistice"],
+      [new Date(y,11,25), "Noël"],
+    ];
+    noms.forEach(([d,n]) => { FERIES_NOMS[d.toISOString().slice(0,10)] = n; });
+  }
+}
+function nomFerie(d) { return FERIES_NOMS[d.toISOString().slice(0,10)] || ""; }
+
+/* ---- Utils ---- */
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function dow(d) { return (d.getDay()+6)%7; }
+function weekNum(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  return Math.ceil((((t-y0)/86400000)+1)/7);
+}
+function legendFor(code) { return PLAN.legende.find(l => l.code === code); }
+function taskById(id) { return PLAN.taches.find(t => String(t.id) === String(id)); }
+
+/* Count filled weekday cells for a task */
+function countDays(tid) {
+  let n = 0;
+  for (let c = 0; c < COLS.length; c++) {
+    if (PLAN.cellules[`${tid}_${c}`] && !isOff(COLS[c])) n++;
+  }
+  return n;
+}
+
+
+/* ---- Init ---- */
+async function init() {
+  // Try fetch (works with local server), fallback to embedded block (works with file://)
+  let loaded = false;
+  try {
+    const res = await fetch("planning.md");
+    if (res.ok) {
+      PLAN = parseMd(await res.text());
+      loaded = true;
+    }
+  } catch(e) {}
+  if (!loaded) {
+    const embedded = document.getElementById("embedded-md");
+    if (embedded && embedded.textContent.trim()) {
+      PLAN = parseMd(embedded.textContent);
+    }
+  }
+  document.getElementById("title").textContent = PLAN.titre || "Planning";
+  document.getElementById("p-start").value = PLAN.params.date_debut;
+  document.getElementById("p-weeks").value = PLAN.params.duree_semaines;
+  renderLegend();
+  buildColumns();
+  fillCellsFromDates();
+  render();
+  bindEvents();
+}
+
+/* ---- Legend ---- */
+function renderLegend() {
+  document.getElementById("legend").innerHTML = PLAN.legende.map(l =>
+    `<span class="chip"><span class="sw" style="background:${l.color}"></span>${l.label}</span>`
+  ).join("");
+}
+
+/* ---- Columns ---- */
+function buildColumns() {
+  const start = new Date(document.getElementById("p-start").value + "T00:00:00");
+  const weeks = parseInt(document.getElementById("p-weeks").value, 10);
+  COLS = [];
+  for (let i = 0; i < weeks * 7; i++) COLS.push(addDays(start, i));
+  buildFeries();
+  buildFeriesNoms();
+}
+
+/* ---- Render ---- */
+function render() {
+  buildColumns();
+  const grid = document.getElementById("grid");
+  let h = "<thead>";
+
+  // Months
+  h += `<tr><th class="task-head" rowspan="4">Tâches</th>` +
+       `<th class="days-head" rowspan="4">Jours</th>` +
+       `<th class="actor-head" rowspan="4">Acteurs</th>`;
+  let i = 0;
+  while (i < COLS.length) {
+    const m = COLS[i].getMonth(); let j = i;
+    while (j < COLS.length && COLS[j].getMonth() === m) j++;
+    h += `<th class="col-month" colspan="${j-i}">${MOIS_NOMS[m]} ${COLS[i].getFullYear()}</th>`;
+    i = j;
+  }
+  h += "</tr>";
+
+  // Weeks
+  h += "<tr>";
+  i = 0;
+  while (i < COLS.length) {
+    const w = weekNum(COLS[i]); let j = i;
+    while (j < COLS.length && weekNum(COLS[j]) === w) j++;
+    h += `<th class="col-week" colspan="${j-i}">S${w}</th>`;
+    i = j;
+  }
+  h += "</tr>";
+
+  // Day names
+  h += "<tr>";
+  COLS.forEach(c => {
+    const cls = isFerie(c) ? " ferie" : (dow(c)>=5 ? " weekend" : "");
+    const tip = isFerie(c) ? ` title="${nomFerie(c)}"` : "";
+    h += `<th class="col-day-name col-date${cls}"${tip}>${JOURS_NOMS[dow(c)]}</th>`;
+  });
+  h += "</tr>";
+
+  // Day numbers
+  h += "<tr>";
+  COLS.forEach(c => {
+    const cls = isFerie(c) ? " ferie" : (dow(c)>=5 ? " weekend" : "");
+    const tip = isFerie(c) ? ` title="${nomFerie(c)}"` : "";
+    h += `<th class="col-day col-date${cls}"${tip}>${c.getDate()}</th>`;
+  });
+  h += "</tr></thead><tbody>";
+
+  // Task rows
+  PLAN.taches.forEach(t => {
+    const isPhase = t.type === "phase";
+    h += `<tr class="${isPhase?"phase":"tache"}" data-tid="${t.id}">`;
+    h += `<td class="task-name" title="${t.nom}">${t.nom}</td>`;
+
+    // Days count
+    const days = isPhase ? "" : countDays(t.id);
+    h += `<td class="days-count">${days === 0 ? "" : days}</td>`;
+
+    // Actor
+    const leg = t.acteur ? legendFor(t.acteur) : null;
+    const aStyle = leg ? ` style="background:${leg.color};color:#333"` : "";
+    h += `<td class="actor-name"${aStyle}>${isPhase ? "" : (leg ? leg.acteur : t.acteur||"")}</td>`;
+
+    // Date cells
+    COLS.forEach((c, ci) => {
+      const off = isFerie(c) ? " ferie" : (dow(c)>=5 ? " weekend" : "");
+      const key = `${t.id}_${ci}`;
+      const code = PLAN.cellules[key];
+      const cleg = code ? legendFor(code) : null;
+      const bg = cleg ? ` style="background:${cleg.color}"` : "";
+      h += `<td class="cell${off}${cleg?" filled":""}" data-key="${key}" data-tid="${t.id}" data-ci="${ci}"${bg}></td>`;
+    });
+    h += "</tr>";
+  });
+
+  // Totals
+  h += "<tr><td colspan=\"3\" style=\"height:4px;border:none;background:none\"></td></tr>";
+  const prestaName = PLAN.params.prestataire || "Prestataire";
+  const clientName = PLAN.params.client || "Client";
+  const prestaCodes = PLAN.legende.filter(l => l.acteur === prestaName).map(l => l.code);
+  const clientCodes = PLAN.legende.filter(l => l.acteur === clientName).map(l => l.code);
+
+  [{ label: prestaName, codes: prestaCodes }, { label: clientName, codes: clientCodes }].forEach(grp => {
+    let n = 0;
+    for (const key in PLAN.cellules) {
+      if (!grp.codes.includes(PLAN.cellules[key])) continue;
+      const ci = parseInt(key.split("_")[1], 10);
+      if (ci < COLS.length && !isOff(COLS[ci])) n++;
+    }
+    h += `<tr class="total" data-total="${grp.label}"><td class="task-name">Total ${grp.label}</td><td class="days-count">${n || ""}</td><td class="actor-name"></td></tr>`;
+  });
+
+  h += "</tbody>";
+  grid.innerHTML = h;
+}
+
+/* ---- Cell set (+ refresh day count) ---- */
+function setCell(key, code) {
+  if (!code) { delete PLAN.cellules[key]; }
+  else { PLAN.cellules[key] = code; }
+  const td = document.querySelector(`td[data-key="${key}"]`);
+  if (!td) return;
+  const leg = code ? legendFor(code) : null;
+  td.style.background = leg ? leg.color : "";
+  td.className = td.className.replace(/ ?filled/g, "") + (leg ? " filled" : "");
+  // Update day count for this row
+  const tid = key.split("_")[0];
+  const dc = document.querySelector(`tr[data-tid="${tid}"] td.days-count`);
+  if (dc) { const n = countDays(tid); dc.textContent = n || ""; }
+  // Update totals
+  refreshTotals();
+}
+
+function refreshTotals() {
+  const prestaName = PLAN.params.prestataire || "Prestataire";
+  const clientName = PLAN.params.client || "Client";
+  const prestaCodes = PLAN.legende.filter(l => l.acteur === prestaName).map(l => l.code);
+  const clientCodes = PLAN.legende.filter(l => l.acteur === clientName).map(l => l.code);
+  [{ label: prestaName, codes: prestaCodes }, { label: clientName, codes: clientCodes }].forEach(grp => {
+    let n = 0;
+    for (const k in PLAN.cellules) {
+      if (!grp.codes.includes(PLAN.cellules[k])) continue;
+      const ci = parseInt(k.split("_")[1], 10);
+      if (ci < COLS.length && !isOff(COLS[ci])) n++;
+    }
+    const tr = document.querySelector(`tr.total[data-total="${grp.label}"]`);
+    if (tr) { const dc = tr.querySelector("td.days-count"); if (dc) dc.textContent = n || ""; }
+  });
+}
+
+function actorCodeForTid(tid) {
+  const t = taskById(tid);
+  return t ? t.acteur : null;
+}
+
+/* ---- Events ---- */
+function bindEvents() {
+  const wrap = document.getElementById("grid-wrap");
+  wrap.addEventListener("dragstart", e => e.preventDefault(), true);
+  wrap.addEventListener("selectstart", e => e.preventDefault(), true);
+
+  wrap.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    const td = e.target.closest("td.cell");
+    if (!td) return;
+    e.preventDefault();
+    const tid = td.dataset.tid;
+    const code = actorCodeForTid(tid);
+    if (!code) return;
+    const ci = parseInt(td.dataset.ci, 10);
+    if (ci < COLS.length && isOff(COLS[ci])) return;
+
+    isDragging = true;
+    dragTid = tid;
+    dragCode = PLAN.cellules[td.dataset.key] ? "" : code;
+    setCell(td.dataset.key, dragCode);
+  });
+
+  wrap.addEventListener("mouseover", e => {
+    if (!isDragging) return;
+    const td = e.target.closest("td.cell");
+    if (!td || td.dataset.tid !== dragTid) return;
+    const ci = parseInt(td.dataset.ci, 10);
+    if (ci < COLS.length && isOff(COLS[ci])) return;
+    setCell(td.dataset.key, dragCode);
+  });
+
+  document.addEventListener("mouseup", () => { isDragging = false; dragTid = null; dragCode = null; });
+
+  wrap.addEventListener("contextmenu", e => {
+    const td = e.target.closest("td.cell");
+    if (!td) return;
+    e.preventDefault();
+    showCtxMenu(e.clientX, e.clientY, td);
+  });
+}
+
+/* ---- Context menu ---- */
+let ctxEl = null;
+function closeCtx() { if (ctxEl) { ctxEl.remove(); ctxEl = null; } }
+document.addEventListener("click", closeCtx);
+
+function showCtxMenu(x, y, td) {
+  closeCtx();
+  const key = td.dataset.key;
+  const tid = td.dataset.tid;
+  const ci  = parseInt(td.dataset.ci, 10);
+  const code = actorCodeForTid(tid);
+  const leg = code ? legendFor(code) : null;
+
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu";
+
+  if (leg) {
+    const sub = document.createElement("div");
+    sub.className = "item sub";
+    sub.innerHTML = `Remplir (${leg.acteur}) ▸<div class="sub-menu">` +
+      [1,2,3,4,5,10,15].map(d =>
+        `<div class="item" data-dur="${d}">${d} jour${d>1?"s":""}</div>`
+      ).join("") + `</div>`;
+    menu.appendChild(sub);
+    sub.querySelectorAll("[data-dur]").forEach(el => {
+      el.addEventListener("click", () => {
+        const dur = parseInt(el.dataset.dur, 10);
+        let col = ci, placed = 0;
+        while (placed < dur && col < COLS.length) {
+          if (isOff(COLS[col])) { col++; continue; }
+          setCell(`${tid}_${col}`, code);
+          col++; placed++;
+        }
+        closeCtx();
+      });
+    });
+  }
+
+  addSep(menu);
+  addItem(menu, "Effacer cette cellule", () => { setCell(key, ""); closeCtx(); });
+  addItem(menu, "Effacer toute la ligne", () => {
+    for (let c = 0; c < COLS.length; c++) setCell(`${tid}_${c}`, "");
+    closeCtx();
+  });
+  addSep(menu);
+
+  const sub1 = document.createElement("div");
+  sub1.className = "item sub";
+  sub1.innerHTML = `Décaler cette tâche ▸` + shiftSubMenu("single");
+  menu.appendChild(sub1);
+
+  const sub2 = document.createElement("div");
+  sub2.className = "item sub";
+  sub2.innerHTML = `Décaler + suivantes ▸` + shiftSubMenu("cascade");
+  menu.appendChild(sub2);
+
+  menu.querySelectorAll("[data-shift]").forEach(el => {
+    el.addEventListener("click", () => {
+      const shift = parseInt(el.dataset.shift, 10);
+      const mode = el.dataset.mode;
+      const tids = [];
+      if (mode === "single") { tids.push(tid); }
+      else {
+        let found = false;
+        PLAN.taches.forEach(t => {
+          if (String(t.id) === String(tid)) found = true;
+          if (found && t.type === "tache") tids.push(String(t.id));
+        });
+      }
+      shiftTasks(tids, shift);
+      closeCtx();
+    });
+  });
+
+  menu.style.left = Math.min(x, window.innerWidth - 240) + "px";
+  menu.style.top  = Math.min(y, window.innerHeight - 350) + "px";
+  document.body.appendChild(menu);
+  ctxEl = menu;
+}
+
+function shiftSubMenu(mode) {
+  return `<div class="sub-menu">` +
+    [-5,-2,-1,1,2,5,10].map(d => {
+      const label = d > 0 ? `+${d} jour${Math.abs(d)>1?"s":""}` : `${d} jour${Math.abs(d)>1?"s":""}`;
+      return `<div class="item" data-shift="${d}" data-mode="${mode}">${label}</div>`;
+    }).join("") + `</div>`;
+}
+function addItem(menu, text, fn) {
+  const d = document.createElement("div");
+  d.className = "item"; d.textContent = text;
+  d.addEventListener("click", fn); menu.appendChild(d);
+}
+function addSep(menu) {
+  const s = document.createElement("div"); s.className = "sep"; menu.appendChild(s);
+}
+
+/* ---- Shift (skip weekends) ---- */
+function shiftColByWorkdays(colIdx, workdays) {
+  let remaining = Math.abs(workdays);
+  const dir = workdays > 0 ? 1 : -1;
+  let c = colIdx;
+  while (remaining > 0) {
+    c += dir;
+    if (c < 0 || c >= COLS.length) break;
+    if (!isOff(COLS[c])) remaining--;
+  }
+  return c;
+}
+
+function shiftTasks(tids, shift) {
+  tids.forEach(tid => {
+    const cells = {};
+    for (let c = 0; c < COLS.length; c++) {
+      const k = `${tid}_${c}`;
+      if (PLAN.cellules[k]) cells[c] = PLAN.cellules[k];
+    }
+    for (const c of Object.keys(cells)) setCell(`${tid}_${c}`, "");
+    for (const [c, code] of Object.entries(cells)) {
+      const nc = shiftColByWorkdays(parseInt(c, 10), shift);
+      if (nc >= 0 && nc < COLS.length) setCell(`${tid}_${nc}`, code);
+    }
+  });
+}
+
+/* ---- Build current MD from state ---- */
+function buildCurrentMd() {
+  let md = `# ${PLAN.titre || "Planning"}\n\n`;
+  md += `## Paramètres\n`;
+  md += `- Date de départ: ${document.getElementById("p-start").value}\n`;
+  md += `- Durée: ${document.getElementById("p-weeks").value} semaines\n`;
+  if (PLAN.params.client) md += `- Client: ${PLAN.params.client}\n`;
+  if (PLAN.params.prestataire) md += `- Prestataire: ${PLAN.params.prestataire}\n`;
+  md += `\n## Légende\n`;
+  PLAN.legende.forEach(l => { md += `- ${l.code}: ${l.color} "${l.label}" acteur="${l.acteur}"\n`; });
+  md += `\n## Planning\n\n`;
+  PLAN.taches.forEach(t => {
+    if (t.type === "phase") { md += `### ${t.nom}\n`; return; }
+    let startCi = -1, days = 0;
+    for (let c = 0; c < COLS.length; c++) {
+      if (PLAN.cellules[`${t.id}_${c}`]) {
+        if (startCi === -1) startCi = c;
+        if (!isOff(COLS[c])) days++;
+      }
+    }
+    let line = `- ${t.nom} | ${t.acteur}`;
+    if (startCi >= 0 && days > 0) {
+      const d = COLS[startCi];
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      line += ` | ${dd}/${mm} | ${days}j`;
+    }
+    md += line + "\n";
+  });
+  md += `\n<!-- VERSION ${saveVersion} -->\n`;
+  return md;
+}
+
+/* ---- Save (versioned) ---- */
+document.getElementById("btn-save").addEventListener("click", () => {
+  saveVersion++;
+  const now = new Date();
+  const ts = now.toISOString().slice(0,10);
+  const md = buildCurrentMd();
+
+  document.getElementById("embedded-md").textContent = md;
+
+  const blob = new Blob([md], { type: "text/markdown" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `planning_v${saveVersion}_${ts}.md`;
+  a.click();
+});
+
+/* ---- Export client (read-only HTML) ---- */
+document.getElementById("btn-export").addEventListener("click", () => {
+  const now = new Date();
+  const ts = now.toISOString().slice(0,10);
+  const dateFr = now.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const md = buildCurrentMd();
+
+  const gridHTML = document.getElementById("grid").outerHTML;
+  const legendHTML = document.getElementById("legend").innerHTML;
+  const title = (PLAN.titre || "Planning").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const cssText = document.querySelector("style").textContent;
+
+  const html = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>${title}</title>
+<style>
+${cssText}
+td.cell { cursor: default; }
+.grid-wrap { -webkit-user-select: auto; user-select: auto; }
+.export-meta { font-size: 11px; color: #888; }
+</style>
+</head>
+<body>
+<header>
+  <h1>${title}</h1>
+  <span class="export-meta">Exporté le ${dateFr}</span>
+  <div class="toolbar"><button onclick="window.print()">🖨 Imprimer</button></div>
+</header>
+<div class="legend-bar">${legendHTML}</div>
+<div class="grid-wrap" id="grid-wrap">
+${gridHTML}
+</div>
+<script type="text/markdown" id="embedded-md">
+${md}\x3c/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const safeName = (PLAN.titre || "planning").replace(/[^a-zA-Z0-9à-ÿ -]/gi, "").replace(/\s+/g, "_");
+  a.download = safeName + "_" + ts + ".html";
+  a.click();
+});
+
+/* ---- Load ---- */
+document.getElementById("btn-load").addEventListener("click", () => {
+  document.getElementById("file-input").click();
+});
+document.getElementById("file-input").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    let text = ev.target.result;
+    // If HTML file, extract the embedded markdown
+    if (file.name.endsWith(".html")) {
+      const m = text.match(/<script type="text\/markdown" id="embedded-md">([\s\S]*?)<\/script>/);
+      if (m) text = m[1];
+    }
+    PLAN = parseMd(text);
+    document.getElementById("embedded-md").textContent = text;
+    document.getElementById("title").textContent = PLAN.titre || "Planning";
+    document.getElementById("p-start").value = PLAN.params.date_debut;
+    document.getElementById("p-weeks").value = PLAN.params.duree_semaines;
+    renderLegend();
+    buildColumns();
+    fillCellsFromDates();
+    render();
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+/* ---- PDF / Params ---- */
+document.getElementById("btn-pdf").addEventListener("click", () => window.print());
+document.getElementById("p-apply").addEventListener("click", render);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeCtx(); });
+
+/* ---- Multi-page print ---- */
+const COLS_PER_PAGE = 35;
+
+function renderPrintPages() {
+  if (COLS.length === 0) return "";
+  const chunks = [];
+  for (let s = 0; s < COLS.length; s += COLS_PER_PAGE)
+    chunks.push([s, Math.min(s + COLS_PER_PAGE, COLS.length)]);
+
+  const legendHTML = PLAN.legende.map(l =>
+    `<span class="chip"><span class="sw" style="background:${l.color}"></span>${l.label}</span>`
+  ).join("");
+
+  const prestaName = PLAN.params.prestataire || "Prestataire";
+  const clientName = PLAN.params.client || "Client";
+  const prestaCodes = PLAN.legende.filter(l => l.acteur === prestaName).map(l => l.code);
+  const clientCodes = PLAN.legende.filter(l => l.acteur === clientName).map(l => l.code);
+  let prestaTotal = 0, clientTotal = 0;
+  for (const k in PLAN.cellules) {
+    const ci = parseInt(k.split("_")[1], 10);
+    if (ci >= COLS.length || isOff(COLS[ci])) continue;
+    if (prestaCodes.includes(PLAN.cellules[k])) prestaTotal++;
+    if (clientCodes.includes(PLAN.cellules[k])) clientTotal++;
+  }
+
+  let out = "";
+  chunks.forEach(([from, to], pi) => {
+    out += `<div class="print-page"><div class="print-page-inner">`;
+    out += `<div class="print-page-header"><h2>${PLAN.titre || "Planning"}</h2>`;
+    out += `<span class="page-num">Page ${pi + 1}/${chunks.length}</span></div>`;
+    out += `<div class="print-legend">${legendHTML}</div>`;
+    out += `<table class="grid"><thead>`;
+
+    // Months
+    out += `<tr><th class="task-head" rowspan="4">Tâches</th>`;
+    out += `<th class="days-head" rowspan="4">Jours</th>`;
+    out += `<th class="actor-head" rowspan="4">Acteurs</th>`;
+    let i = from;
+    while (i < to) {
+      const m = COLS[i].getMonth(); let j = i;
+      while (j < to && COLS[j].getMonth() === m) j++;
+      out += `<th class="col-month col-date" colspan="${j - i}">${MOIS_NOMS[m]} ${COLS[i].getFullYear()}</th>`;
+      i = j;
+    }
+    out += `</tr><tr>`;
+
+    // Weeks
+    i = from;
+    while (i < to) {
+      const w = weekNum(COLS[i]); let j = i;
+      while (j < to && weekNum(COLS[j]) === w) j++;
+      out += `<th class="col-week col-date" colspan="${j - i}">S${w}</th>`;
+      i = j;
+    }
+    out += `</tr><tr>`;
+
+    // Day names
+    for (let c = from; c < to; c++) {
+      const cls = isFerie(COLS[c]) ? " ferie" : (dow(COLS[c]) >= 5 ? " weekend" : "");
+      out += `<th class="col-day-name col-date${cls}">${JOURS_NOMS[dow(COLS[c])]}</th>`;
+    }
+    out += `</tr><tr>`;
+
+    // Day numbers
+    for (let c = from; c < to; c++) {
+      const cls = isFerie(COLS[c]) ? " ferie" : (dow(COLS[c]) >= 5 ? " weekend" : "");
+      out += `<th class="col-day col-date${cls}">${COLS[c].getDate()}</th>`;
+    }
+    out += `</tr></thead><tbody>`;
+
+    // Tasks
+    PLAN.taches.forEach(t => {
+      const isPhase = t.type === "phase";
+      out += `<tr class="${isPhase ? "phase" : "tache"}">`;
+      out += `<td class="task-name">${t.nom}</td>`;
+      out += `<td class="days-count">${isPhase ? "" : (countDays(t.id) || "")}</td>`;
+      const leg = t.acteur ? legendFor(t.acteur) : null;
+      out += `<td class="actor-name"${leg ? ` style="background:${leg.color};color:#333"` : ""}>`;
+      out += `${isPhase ? "" : (leg ? leg.acteur : t.acteur || "")}</td>`;
+      for (let c = from; c < to; c++) {
+        const off = isFerie(COLS[c]) ? " ferie" : (dow(COLS[c]) >= 5 ? " weekend" : "");
+        const code = PLAN.cellules[`${t.id}_${c}`];
+        const cleg = code ? legendFor(code) : null;
+        out += `<td class="cell${off}${cleg ? " filled" : ""}"${cleg ? ` style="background:${cleg.color}"` : ""}></td>`;
+      }
+      out += `</tr>`;
+    });
+
+    // Totals
+    out += `<tr><td colspan="3" style="height:4px;border:none;background:none"></td></tr>`;
+    out += `<tr class="total"><td class="task-name">Total ${prestaName}</td>`;
+    out += `<td class="days-count">${prestaTotal || ""}</td><td class="actor-name"></td></tr>`;
+    out += `<tr class="total"><td class="task-name">Total ${clientName}</td>`;
+    out += `<td class="days-count">${clientTotal || ""}</td><td class="actor-name"></td></tr>`;
+    out += `</tbody></table></div></div>`;
+  });
+  return out;
+}
+
+let printDiv = null;
+window.addEventListener("beforeprint", () => {
+  printDiv = document.createElement("div");
+  printDiv.id = "print-pages";
+  printDiv.innerHTML = renderPrintPages();
+  document.querySelector("header").classList.add("no-print");
+  document.querySelector(".legend-bar").classList.add("no-print");
+  document.getElementById("grid-wrap").classList.add("no-print");
+  document.body.appendChild(printDiv);
+
+  const nRows = PLAN.taches.length;
+  const contentH = 200 + nRows * 18;
+  const scale = Math.min(1, 680 / contentH);
+  if (scale < 1) {
+    printDiv.querySelectorAll(".print-page-inner").forEach(el => {
+      el.style.zoom = scale;
+    });
+  }
+});
+window.addEventListener("afterprint", () => {
+  if (!printDiv) return;
+  printDiv.remove();
+  printDiv = null;
+  document.querySelector("header").classList.remove("no-print");
+  document.querySelector(".legend-bar").classList.remove("no-print");
+  document.getElementById("grid-wrap").classList.remove("no-print");
+});
+
+/* ---- Go ---- */
+init();
+</script>
+</body>
+</html>

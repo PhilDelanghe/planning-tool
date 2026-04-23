@@ -1,0 +1,8 @@
+planning_v*_*.md
+planning.json
+extract.py
+*.pdf
+*.png
+*.xlsx
+*.xlsm
+.DS_Store
