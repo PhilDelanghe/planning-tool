@@ -6,3 +6,7 @@ extract.py
 *.xlsx
 *.xlsm
 .DS_Store
+
+# Fichiers client (repo public : ne pas pousser les noms ni les contenus client)
+planning_Novartis_*
+
